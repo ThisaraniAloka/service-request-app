@@ -137,21 +137,21 @@ function Footer() {
             <span className="text-2xl">📞</span>
             <div>
               <p className="text-sm">Call Us</p>
-              <p className="font-semibold">+1 (555) 123-4567</p>
+              <p className="font-semibold">+94 71 404 670</p>
             </div>
           </div>
           <div className="flex items-center justify-center space-x-3 text-gray-300">
             <span className="text-2xl">✉️</span>
             <div>
               <p className="text-sm">Email Us</p>
-              <p className="font-semibold">hello@ridesync.com</p>
+              <p className="font-semibold">ridesync@gmail.com</p>
             </div>
           </div>
           <div className="flex items-center justify-center space-x-3 text-gray-300">
             <span className="text-2xl">📍</span>
             <div>
               <p className="text-sm">Visit Us</p>
-              <p className="font-semibold">123 Travel Street, City</p>
+              <p className="font-semibold">Chilaw Road, Sri-Lanka</p>
             </div>
           </div>
         </div>
@@ -162,12 +162,12 @@ function Footer() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
             <p className="text-gray-400 text-sm">
-              © 2024 <span className="text-blue-400 font-semibold">RideSync</span>. All rights reserved.
+              © 2024 <span className="text-blue-400 font-semibold">Thisarani Aloka</span>. All rights reserved.
             </p>
             <div className="flex items-center space-x-6 text-sm text-gray-400">
               <span>Made with ❤️ for amazing journeys</span>
               <div className="w-1 h-1 bg-gray-600 rounded-full"></div>
-              <span>Designed with Tailwind CSS</span>
+              
             </div>
           </div>
         </div>
