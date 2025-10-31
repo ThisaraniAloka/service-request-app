@@ -11,7 +11,8 @@ const {
   getAdminRequests,
   updateRequestStatus,
   scheduleRequest,
-  getUserRequests  // Import the new function
+  getUserRequests,
+  getDailyAnalytics
 } = require('./controllers');
 const router = express.Router();
 
@@ -36,5 +37,8 @@ router.post('/auth/login', loginUser);
 // User profile routes
 router.put('/user/profile', updateUserProfile);
 router.get('/user/:id', getUserById);
+
+router.get('/admin/analytics/daily', getDailyAnalytics);
+
 
 module.exports = router;

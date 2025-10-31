@@ -400,6 +400,28 @@ const getUserById = async (req, res) => {
   }
 };
 
+
+// Get daily analytics data for the last 7 days
+const getDailyAnalytics = async (req, res) => {
+  try {
+    const db = getDB();
+
+    const [rows] = await db.query(`
+      SELECT DATE(created_at) as date, COUNT(*) as count
+      FROM service_requests
+      WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+      GROUP BY DATE(created_at)
+      ORDER BY date ASC
+    `);
+
+    res.json(rows);
+  } catch (err) {
+    console.error("❌ Error fetching analytics:", err);
+    res.status(500).json({ message: "Failed to fetch analytics", error: err.message });
+  }
+};
+
+
 module.exports = { 
   getRequests, 
   createRequest, 
@@ -412,5 +434,6 @@ module.exports = {
   getAdminRequests,
   updateRequestStatus,
   scheduleRequest,
-  getUserRequests
+  getUserRequests,
+  getDailyAnalytics
 };

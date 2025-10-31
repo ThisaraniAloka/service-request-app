@@ -11,7 +11,7 @@ const AnalyticsChart = () => {
 
   const fetchAnalytics = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/admin/analytics/daily');
+      const response = await fetch('http://localhost:5000/api/admin/analytics/daily')
       const data = await response.json();
       setAnalyticsData(data);
     } catch (error) {
