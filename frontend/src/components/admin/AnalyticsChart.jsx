@@ -1,4 +1,3 @@
-// src/components/admin/AnalyticsChart.jsx
 import React, { useState, useEffect } from 'react';
 
 const AnalyticsChart = () => {
