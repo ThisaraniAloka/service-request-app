@@ -1,4 +1,4 @@
-const { pool, bcrypt } = require('./models');
+const { getDB, bcrypt } = require('./models');
 
 // Get requests for specific user (for customer dashboard)
 const getUserRequests = async (req, res) => {
@@ -10,18 +10,13 @@ const getUserRequests = async (req, res) => {
     let query = `SELECT * FROM service_requests WHERE 1=1`;
     const queryParams = [];
 
-    // Filter by user ID if provided
     if (userId) {
       query += ` AND customer_id = ?`;
       queryParams.push(userId);
-    }
-    // Fallback: filter by email if no user ID but email provided
-    else if (userEmail) {
+    } else if (userEmail) {
       query += ` AND customer_email = ?`;
       queryParams.push(userEmail);
-    }
-    // If no user info provided, return empty array
-    else {
+    } else {
       return res.json({
         success: true,
         data: [],
@@ -34,8 +29,9 @@ const getUserRequests = async (req, res) => {
     console.log('📝 User requests query:', query);
     console.log('📊 Query params:', queryParams);
 
-    const [rows] = await pool.query(query, queryParams);
-    
+    const db = getDB();
+    const [rows] = await db.query(query, queryParams);
+
     console.log(`✅ Found ${rows.length} requests for user`);
     
     res.json({
@@ -56,7 +52,8 @@ const getUserRequests = async (req, res) => {
 // Get all requests (for public API - used by admin)
 const getRequests = async (req, res) => {
   try {
-    const [rows] = await pool.query("SELECT * FROM service_requests ORDER BY created_at DESC, id DESC");
+    const db = getDB();
+    const [rows] = await db.query("SELECT * FROM service_requests ORDER BY created_at DESC, id DESC");
     res.json({
       success: true,
       data: rows
@@ -73,28 +70,15 @@ const getRequests = async (req, res) => {
 
 // Create request - now includes user info
 const createRequest = async (req, res) => {
-  const { 
-    customer_name, 
-    phone, 
-    pickup_location, 
-    dropoff_location, 
-    pickup_time, 
-    passengers, 
-    notes,
-    customer_email,
-    customer_id 
-  } = req.body;
+  const { customer_name, phone, pickup_location, dropoff_location, pickup_time, passengers, notes, customer_email, customer_id } = req.body;
   
-  // Validation
   if (!customer_name || !phone || !pickup_location || !dropoff_location || !pickup_time || !passengers) {
-    return res.status(400).json({ 
-      success: false,
-      message: "Missing required fields" 
-    });
+    return res.status(400).json({ success: false, message: "Missing required fields" });
   }
 
   try {
-    const [result] = await pool.query(
+    const db = getDB();
+    const [result] = await db.query(
       `INSERT INTO service_requests 
        (customer_name, phone, pickup_location, dropoff_location, pickup_time, passengers, notes, customer_email, customer_id) 
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -118,11 +102,7 @@ const createRequest = async (req, res) => {
     });
   } catch (err) {
     console.error("❌ Database error:", err);
-    res.status(400).json({ 
-      success: false,
-      message: "Invalid data", 
-      error: err.message 
-    });
+    res.status(400).json({ success: false, message: "Invalid data", error: err.message });
   }
 };
 
@@ -131,25 +111,13 @@ const getAdminRequests = async (req, res) => {
   try {
     console.log('📋 Fetching admin requests with filters:', req.query);
     
-    const {
-      status = 'all',
-      search = '',
-      page = 1,
-      limit = 10
-    } = req.query;
+    const { status = 'all', search = '', page = 1, limit = 10 } = req.query;
 
-    let baseQuery = `
-      SELECT * FROM service_requests 
-      WHERE 1=1
-    `;
-    let countQuery = `
-      SELECT COUNT(*) as total FROM service_requests 
-      WHERE 1=1
-    `;
+    let baseQuery = `SELECT * FROM service_requests WHERE 1=1`;
+    let countQuery = `SELECT COUNT(*) as total FROM service_requests WHERE 1=1`;
     const queryParams = [];
     const countParams = [];
 
-    // Status filter
     if (status && status !== 'all') {
       baseQuery += ` AND status = ?`;
       countQuery += ` AND status = ?`;
@@ -157,7 +125,6 @@ const getAdminRequests = async (req, res) => {
       countParams.push(status);
     }
 
-    // Search filter
     if (search && search.trim() !== '') {
       baseQuery += ` AND (customer_name LIKE ? OR phone LIKE ?)`;
       countQuery += ` AND (customer_name LIKE ? OR phone LIKE ?)`;
@@ -166,10 +133,7 @@ const getAdminRequests = async (req, res) => {
       countParams.push(searchTerm, searchTerm);
     }
 
-    // Order by created_at
     baseQuery += ` ORDER BY created_at DESC, id DESC`;
-    
-    // Add LIMIT and OFFSET for pagination
     const offset = (parseInt(page) - 1) * parseInt(limit);
     baseQuery += ` LIMIT ? OFFSET ?`;
     queryParams.push(parseInt(limit), offset);
@@ -177,15 +141,14 @@ const getAdminRequests = async (req, res) => {
     console.log('🔍 Final query:', baseQuery);
     console.log('📊 Query params:', queryParams);
 
-    // Get total count
-    const [countResult] = await pool.query(countQuery, countParams);
+    const db = getDB();
+    const [countResult] = await db.query(countQuery, countParams);
     const total = countResult[0]?.total || 0;
 
-    // Get paginated results
-    const [rows] = await pool.query(baseQuery, queryParams);
+    const [rows] = await db.query(baseQuery, queryParams);
 
     const pagination = {
-      total: total,
+      total,
       pages: Math.ceil(total / limit),
       current: parseInt(page),
       limit: parseInt(limit)
@@ -194,18 +157,10 @@ const getAdminRequests = async (req, res) => {
     console.log(`✅ Found ${rows.length} requests`);
     console.log('📄 Pagination:', pagination);
 
-    res.json({
-      success: true,
-      requests: rows,
-      pagination
-    });
+    res.json({ success: true, requests: rows, pagination });
   } catch (err) {
     console.error("❌ Error fetching admin requests:", err);
-    res.status(500).json({ 
-      success: false,
-      message: "Failed to fetch requests",
-      error: err.message 
-    });
+    res.status(500).json({ success: false, message: "Failed to fetch requests", error: err.message });
   }
 };
 
@@ -217,44 +172,29 @@ const updateRequestStatus = async (req, res) => {
   console.log('🔄 Updating status for request:', id, 'to:', status);
 
   if (!status) {
-    return res.status(400).json({ 
-      success: false,
-      message: "Status is required" 
-    });
+    return res.status(400).json({ success: false, message: "Status is required" });
   }
 
   const validStatuses = ['pending', 'approved', 'rejected', 'scheduled'];
   if (!validStatuses.includes(status)) {
-    return res.status(400).json({ 
-      success: false,
-      message: "Invalid status" 
-    });
+    return res.status(400).json({ success: false, message: "Invalid status" });
   }
 
   try {
-    const [result] = await pool.query(
+    const db = getDB();
+    const [result] = await db.query(
       `UPDATE service_requests SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
       [status, id]
     );
 
     if (result.affectedRows === 0) {
-      return res.status(404).json({ 
-        success: false,
-        message: "Request not found" 
-      });
+      return res.status(404).json({ success: false, message: "Request not found" });
     }
 
-    res.json({ 
-      success: true,
-      message: "Status updated successfully" 
-    });
+    res.json({ success: true, message: "Status updated successfully" });
   } catch (err) {
     console.error("❌ Error updating status:", err);
-    res.status(500).json({ 
-      success: false,
-      message: "Failed to update status",
-      error: err.message 
-    });
+    res.status(500).json({ success: false, message: "Failed to update status", error: err.message });
   }
 };
 
@@ -266,14 +206,12 @@ const scheduleRequest = async (req, res) => {
   console.log('📅 Scheduling request:', id, 'with data:', req.body);
 
   if (!scheduled_time) {
-    return res.status(400).json({ 
-      success: false,
-      message: "Scheduled time is required" 
-    });
+    return res.status(400).json({ success: false, message: "Scheduled time is required" });
   }
 
   try {
-    const [result] = await pool.query(
+    const db = getDB();
+    const [result] = await db.query(
       `UPDATE service_requests 
        SET status = 'scheduled', scheduled_time = ?, driver_id = ?, vehicle_id = ?, updated_at = CURRENT_TIMESTAMP 
        WHERE id = ?`,
@@ -281,23 +219,13 @@ const scheduleRequest = async (req, res) => {
     );
 
     if (result.affectedRows === 0) {
-      return res.status(404).json({ 
-        success: false,
-        message: "Request not found" 
-      });
+      return res.status(404).json({ success: false, message: "Request not found" });
     }
 
-    res.json({ 
-      success: true,
-      message: "Request scheduled successfully" 
-    });
+    res.json({ success: true, message: "Request scheduled successfully" });
   } catch (err) {
     console.error("❌ Error scheduling request:", err);
-    res.status(500).json({ 
-      success: false,
-      message: "Failed to schedule request",
-      error: err.message 
-    });
+    res.status(500).json({ success: false, message: "Failed to schedule request", error: err.message });
   }
 };
 
@@ -305,50 +233,32 @@ const scheduleRequest = async (req, res) => {
 const createContactMessage = async (req, res) => {
   const { name, email, phone, subject, message } = req.body;
   
-  // Basic validation
   if (!name || !email || !subject || !message) {
-    return res.status(400).json({ 
-      success: false,
-      message: "Missing required fields: name, email, subject, and message are required" 
-    });
+    return res.status(400).json({ success: false, message: "Missing required fields: name, email, subject, and message are required" });
   }
 
   try {
-    const [result] = await pool.query(
-      `INSERT INTO contact_messages (name, email, phone, subject, message) 
-       VALUES (?, ?, ?, ?, ?)`,
+    const db = getDB();
+    const [result] = await db.query(
+      `INSERT INTO contact_messages (name, email, phone, subject, message) VALUES (?, ?, ?, ?, ?)`,
       [name, email, phone || '', subject, message]
     );
     
-    res.status(201).json({ 
-      success: true,
-      id: result.insertId, 
-      message: "Thank you for your message! We'll get back to you soon." 
-    });
+    res.status(201).json({ success: true, id: result.insertId, message: "Thank you for your message! We'll get back to you soon." });
   } catch (err) {
     console.error("❌ Database error:", err);
-    res.status(500).json({ 
-      success: false,
-      message: "Failed to save your message. Please try again later.",
-      error: err.message 
-    });
+    res.status(500).json({ success: false, message: "Failed to save your message. Please try again later.", error: err.message });
   }
 };
 
 // Get all contact messages (for admin panel)
 const getContactMessages = async (req, res) => {
   try {
-    const [rows] = await pool.query("SELECT * FROM contact_messages ORDER BY created_at DESC");
-    res.json({
-      success: true,
-      data: rows
-    });
+    const db = getDB();
+    const [rows] = await db.query("SELECT * FROM contact_messages ORDER BY created_at DESC");
+    res.json({ success: true, data: rows });
   } catch (err) {
-    res.status(500).json({ 
-      success: false,
-      message: "Failed to fetch messages", 
-      error: err.message 
-    });
+    res.status(500).json({ success: false, message: "Failed to fetch messages", error: err.message });
   }
 };
 
@@ -356,63 +266,34 @@ const getContactMessages = async (req, res) => {
 const registerUser = async (req, res) => {
   const { name, email, password, confirmPassword } = req.body;
 
-  // Validation
   if (!name || !email || !password || !confirmPassword) {
-    return res.status(400).json({ 
-      success: false,
-      message: "All fields are required" 
-    });
+    return res.status(400).json({ success: false, message: "All fields are required" });
   }
 
   if (password !== confirmPassword) {
-    return res.status(400).json({ 
-      success: false,
-      message: "Passwords do not match" 
-    });
+    return res.status(400).json({ success: false, message: "Passwords do not match" });
   }
 
   if (password.length < 6) {
-    return res.status(400).json({ 
-      success: false,
-      message: "Password must be at least 6 characters" 
-    });
+    return res.status(400).json({ success: false, message: "Password must be at least 6 characters" });
   }
 
   try {
-    // Check if user already exists
-    const [existingUsers] = await pool.query(
-      "SELECT id FROM users WHERE email = ?",
-      [email]
-    );
+    const db = getDB();
+    const [existingUsers] = await db.query("SELECT id FROM users WHERE email = ?", [email]);
 
     if (existingUsers.length > 0) {
-      return res.status(400).json({ 
-        success: false,
-        message: "User already exists with this email" 
-      });
+      return res.status(400).json({ success: false, message: "User already exists with this email" });
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    // Create user
-    const [result] = await pool.query(
-      `INSERT INTO users (name, email, password) VALUES (?, ?, ?)`,
-      [name, email, hashedPassword]
-    );
+    const [result] = await db.query("INSERT INTO users (name, email, password) VALUES (?, ?, ?)", [name, email, hashedPassword]);
 
-    res.status(201).json({ 
-      success: true,
-      id: result.insertId, 
-      message: "Registration successful! Please login." 
-    });
+    res.status(201).json({ success: true, id: result.insertId, message: "Registration successful! Please login." });
   } catch (err) {
     console.error("❌ Registration error:", err);
-    res.status(500).json({ 
-      success: false,
-      message: "Registration failed. Please try again.",
-      error: err.message 
-    });
+    res.status(500).json({ success: false, message: "Registration failed. Please try again.", error: err.message });
   }
 };
 
@@ -420,41 +301,25 @@ const registerUser = async (req, res) => {
 const loginUser = async (req, res) => {
   const { email, password } = req.body;
 
-  // Validation
   if (!email || !password) {
-    return res.status(400).json({ 
-      success: false,
-      message: "Email and password are required" 
-    });
+    return res.status(400).json({ success: false, message: "Email and password are required" });
   }
 
   try {
-    // Find user
-    const [users] = await pool.query(
-      "SELECT * FROM users WHERE email = ?",
-      [email]
-    );
+    const db = getDB();
+    const [users] = await db.query("SELECT * FROM users WHERE email = ?", [email]);
 
     if (users.length === 0) {
-      return res.status(401).json({ 
-        success: false,
-        message: "Invalid email or password" 
-      });
+      return res.status(401).json({ success: false, message: "Invalid email or password" });
     }
 
     const user = users[0];
-
-    // Check password
     const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid) {
-      return res.status(401).json({ 
-        success: false,
-        message: "Invalid email or password" 
-      });
+      return res.status(401).json({ success: false, message: "Invalid email or password" });
     }
 
-    // Login successful - include all user data
     res.status(200).json({ 
       success: true,
       message: "Login successful!",
@@ -469,11 +334,7 @@ const loginUser = async (req, res) => {
     });
   } catch (err) {
     console.error("❌ Login error:", err);
-    res.status(500).json({ 
-      success: false,
-      message: "Login failed. Please try again.",
-      error: err.message 
-    });
+    res.status(500).json({ success: false, message: "Login failed. Please try again.", error: err.message });
   }
 };
 
@@ -484,27 +345,21 @@ const updateUserProfile = async (req, res) => {
   console.log('👤 Updating profile for user ID:', id);
   
   if (!id) {
-    return res.status(400).json({ 
-      success: false,
-      message: "User ID is required" 
-    });
+    return res.status(400).json({ success: false, message: "User ID is required" });
   }
 
   try {
-    const [result] = await pool.query(
+    const db = getDB();
+    const [result] = await db.query(
       `UPDATE users SET name = ?, email = ?, phone = ?, profile_image = ? WHERE id = ?`,
       [name, email, phone, profile_image, id]
     );
 
     if (result.affectedRows === 0) {
-      return res.status(404).json({ 
-        success: false,
-        message: "User not found" 
-      });
+      return res.status(404).json({ success: false, message: "User not found" });
     }
 
-    // Get updated user data
-    const [users] = await pool.query("SELECT * FROM users WHERE id = ?", [id]);
+    const [users] = await db.query("SELECT * FROM users WHERE id = ?", [id]);
     const user = users[0];
 
     res.status(200).json({
@@ -521,11 +376,7 @@ const updateUserProfile = async (req, res) => {
     });
   } catch (err) {
     console.error("❌ Profile update error:", err);
-    res.status(500).json({ 
-      success: false,
-      message: "Failed to update profile",
-      error: err.message 
-    });
+    res.status(500).json({ success: false, message: "Failed to update profile", error: err.message });
   }
 };
 
@@ -534,34 +385,18 @@ const getUserById = async (req, res) => {
   const { id } = req.params;
   
   try {
-    const [users] = await pool.query("SELECT * FROM users WHERE id = ?", [id]);
+    const db = getDB();
+    const [users] = await db.query("SELECT * FROM users WHERE id = ?", [id]);
     
     if (users.length === 0) {
-      return res.status(404).json({ 
-        success: false,
-        message: "User not found" 
-      });
+      return res.status(404).json({ success: false, message: "User not found" });
     }
 
     const user = users[0];
-    res.json({
-      success: true,
-      data: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        profile_image: user.profile_image,
-        role: user.role
-      }
-    });
+    res.json({ success: true, data: { id: user.id, name: user.name, email: user.email, phone: user.phone, profile_image: user.profile_image, role: user.role } });
   } catch (err) {
     console.error("❌ Get user error:", err);
-    res.status(500).json({ 
-      success: false,
-      message: "Failed to get user",
-      error: err.message 
-    });
+    res.status(500).json({ success: false, message: "Failed to get user", error: err.message });
   }
 };
 
@@ -577,5 +412,5 @@ module.exports = {
   getAdminRequests,
   updateRequestStatus,
   scheduleRequest,
-  getUserRequests  // Add this new function
+  getUserRequests
 };

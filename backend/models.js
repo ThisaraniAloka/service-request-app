@@ -5,22 +5,26 @@ const bcrypt = require('bcryptjs');
 
 dotenv.config();
 
+const DB_NAME = process.env.DB_NAME || 'trip_requests';
+
+let dbPool; // Will hold the pool connected to the database
+
+// 1️⃣ Connect to MySQL server without specifying a database
 const pool = mysql.createPool({
   host: process.env.DB_HOST || 'db',
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'trip_requests',
   port: process.env.DB_PORT || 3306,
 });
 
-// Wait for DB
+// 2️⃣ Wait for MySQL server to be ready
 const waitForDB = async () => {
   let connected = false;
   while (!connected) {
     try {
       await pool.query('SELECT 1');
       connected = true;
-      console.log('✅ Database connected!');
+      console.log('✅ MySQL server connected!');
     } catch (err) {
       console.log('⏳ Waiting for DB...', err.message);
       await new Promise(res => setTimeout(res, 2000));
@@ -28,12 +32,26 @@ const waitForDB = async () => {
   }
 };
 
+// 3️⃣ Initialize database and tables
 const initDB = async () => {
   await waitForDB();
 
   try {
-    // service_requests
-    await pool.query(`
+    // Create the database if it doesn't exist
+    await pool.query(`CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\`;`);
+    console.log(`✅ Database '${DB_NAME}' ensured`);
+
+    // Connect to the newly created database
+    dbPool = mysql.createPool({
+      host: process.env.DB_HOST || 'db',
+      user: process.env.DB_USER || 'root',
+      password: process.env.DB_PASSWORD || '',
+      database: DB_NAME,
+      port: process.env.DB_PORT || 3306,
+    });
+
+    // Create tables
+    await dbPool.query(`
       CREATE TABLE IF NOT EXISTS service_requests (
         id INT AUTO_INCREMENT PRIMARY KEY,
         customer_name VARCHAR(255),
@@ -54,8 +72,7 @@ const initDB = async () => {
       );
     `);
 
-    // contact_messages
-    await pool.query(`
+    await dbPool.query(`
       CREATE TABLE IF NOT EXISTS contact_messages (
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(100) NOT NULL,
@@ -68,8 +85,7 @@ const initDB = async () => {
       );
     `);
 
-    // users
-    await pool.query(`
+    await dbPool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(100) NOT NULL,
@@ -83,8 +99,7 @@ const initDB = async () => {
       );
     `);
 
-    // vehicles
-    await pool.query(`
+    await dbPool.query(`
       CREATE TABLE IF NOT EXISTS vehicles (
         id INT AUTO_INCREMENT PRIMARY KEY,
         plate VARCHAR(50) NOT NULL,
@@ -93,8 +108,7 @@ const initDB = async () => {
       );
     `);
 
-    // drivers
-    await pool.query(`
+    await dbPool.query(`
       CREATE TABLE IF NOT EXISTS drivers (
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(100) NOT NULL,
@@ -104,28 +118,32 @@ const initDB = async () => {
     `);
 
     // Seed default admin
-    const [admins] = await pool.query(`SELECT * FROM users WHERE role='admin'`);
+    const [admins] = await dbPool.query(`SELECT * FROM users WHERE role='admin'`);
     if (admins.length === 0) {
       const hashedPassword = await bcrypt.hash('admin123', 10);
-      await pool.query(`INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)`,
-        ['Admin', 'admin@gmail.com', hashedPassword, 'admin']);
+      await dbPool.query(
+        `INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)`,
+        ['Admin', 'admin@gmail.com', hashedPassword, 'admin']
+      );
       console.log('➕ Default admin created: admin@gmail.com / admin123');
     }
 
     // Seed vehicles
-    const [vehicles] = await pool.query(`SELECT * FROM vehicles`);
+    const [vehicles] = await dbPool.query(`SELECT * FROM vehicles`);
     if (vehicles.length === 0) {
-      await pool.query(`
+      await dbPool.query(`
         INSERT INTO vehicles (plate, capacity) VALUES
-        ('ABC-123', 15), ('XYZ-789', 25), ('DEF-456', 30)
+        ('ABC-123', 15),
+        ('XYZ-789', 25),
+        ('DEF-456', 30)
       `);
       console.log('➕ Default vehicles added');
     }
 
     // Seed drivers
-    const [drivers] = await pool.query(`SELECT * FROM drivers`);
+    const [drivers] = await dbPool.query(`SELECT * FROM drivers`);
     if (drivers.length === 0) {
-      await pool.query(`
+      await dbPool.query(`
         INSERT INTO drivers (name, phone) VALUES
         ('John Driver', '+1-555-0101'),
         ('Sarah Smith', '+1-555-0102'),
@@ -140,4 +158,12 @@ const initDB = async () => {
   }
 };
 
-module.exports = { pool, initDB, bcrypt };
+// Export the pool connected to the DB AFTER initDB runs
+const getDB = () => {
+  if (!dbPool) {
+    throw new Error('DB not initialized yet. Call initDB() first.');
+  }
+  return dbPool;
+};
+
+module.exports = { initDB, getDB, bcrypt };
