@@ -65,20 +65,20 @@ const Contact = () => {
     {
       icon: '📞',
       title: 'Call Us',
-      details: '+1 (555) 123-4567',
+      details: '+94 71 4067894',
       description: 'Mon to Fri 9am to 6pm'
     },
     {
       icon: '✉️',
       title: 'Email Us',
-      details: 'hello@ridesync.com',
+      details: 'ridesync@gmail.com',
       description: 'Send us your query anytime!'
     },
     {
       icon: '📍',
       title: 'Visit Us',
-      details: '123 Travel Street, Suite 100',
-      description: 'New York, NY 10001, USA'
+      details: 'Chilaw Road, Bingiriya',
+      description: 'Sri-Lanka'
     },
     {
       icon: '🕒',
@@ -300,8 +300,8 @@ const Contact = () => {
                     </div>
                     <div>
                       <h3 className="font-bold text-gray-900 text-sm">RideSync Office</h3>
-                      <p className="text-gray-600 text-xs">123 Travel Street</p>
-                      <p className="text-gray-600 text-xs">New York, NY 10001</p>
+                      <p className="text-gray-600 text-xs">Chilaw Road</p>
+                      <p className="text-gray-600 text-xs">Sri-Lanka</p>
                     </div>
                   </div>
                 </div>
