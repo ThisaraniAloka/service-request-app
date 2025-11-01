@@ -14,7 +14,7 @@ app.use('/api', router);
 const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
-  await initDB(); // ✅ ensures DB and tables are ready
+  await initDB(); //  ensures DB and tables are ready
   app.listen(PORT, () => console.log(`🚀 Backend running on port ${PORT}`));
 };
 

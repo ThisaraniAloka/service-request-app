@@ -68,7 +68,7 @@ const getRequests = async (req, res) => {
   }
 };
 
-// Create request - now includes user info
+// Create request -  includes user info
 const createRequest = async (req, res) => {
   const { customer_name, phone, pickup_location, dropoff_location, pickup_time, passengers, notes, customer_email, customer_id } = req.body;
   
